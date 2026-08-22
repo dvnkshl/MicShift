@@ -12,7 +12,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let menu = NSMenu()
     private let headerItem = NSMenuItem()
     private let headerView = StatusMenuHeaderView(frame: .zero)
-    private let receiverItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let transmittersItem = NSMenuItem(title: "Transmitters", action: nil, keyEquivalent: "")
     private let automaticItem = NSMenuItem(title: "Automatic Switching", action: #selector(toggleEnabled), keyEquivalent: "")
     private let djiInputItem = NSMenuItem(title: "DJI Input", action: nil, keyEquivalent: "")
@@ -51,14 +50,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(headerItem)
         menu.addItem(.separator())
 
-        receiverItem.isEnabled = false
-        menu.addItem(receiverItem)
-        menu.addItem(transmittersItem)
-        menu.addItem(.separator())
         automaticItem.target = self
         menu.addItem(automaticItem)
         menu.addItem(djiInputItem)
         menu.addItem(fallbackInputItem)
+        menu.addItem(.separator())
+        menu.addItem(transmittersItem)
         launchAtLoginItem.target = self
         menu.addItem(launchAtLoginItem)
 
@@ -91,13 +88,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         )
 
         if let snapshot = controller.snapshot, snapshot.receiverPresent {
-            let protocolName = snapshot.protocolVersion.map { "v\($0)" } ?? "detecting…"
-            receiverItem.title = "Receiver: connected · USB protocol \(protocolName)"
-            receiverItem.isHidden = false
             transmittersItem.isHidden = false
             updateTransmitterMenu(snapshot: snapshot)
         } else {
-            receiverItem.isHidden = true
             transmittersItem.isHidden = true
         }
 
