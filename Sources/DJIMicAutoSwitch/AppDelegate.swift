@@ -12,10 +12,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let menu = NSMenu()
     private let headerItem = NSMenuItem()
     private let headerView = StatusMenuHeaderView(frame: .zero)
-    private let transmittersItem = NSMenuItem(title: "Transmitters", action: nil, keyEquivalent: "")
+    private let transmittersItem = NSMenuItem(title: "Microphone Details", action: nil, keyEquivalent: "")
     private let automaticItem = NSMenuItem(title: "Automatic Switching", action: #selector(toggleEnabled), keyEquivalent: "")
-    private let djiInputItem = NSMenuItem(title: "DJI Input", action: nil, keyEquivalent: "")
-    private let fallbackInputItem = NSMenuItem(title: "Fallback Input", action: nil, keyEquivalent: "")
+    private let djiInputItem = NSMenuItem(title: "Wireless Mic", action: nil, keyEquivalent: "")
+    private let fallbackInputItem = NSMenuItem(title: "Fallback Mic", action: nil, keyEquivalent: "")
     private let launchAtLoginItem = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
     private let errorSeparator = NSMenuItem.separator()
     private let errorItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
@@ -133,10 +133,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let accessibility = stateText()
         switch controller.state {
         case .usingDJI:
-            let linked = controller.snapshot?.transmitters
-                .filter(\.isUsable)
-                .map { "TX\($0.slot) linked" }
-                .joined(separator: " · ") ?? "Transmitter linked"
+            let linkedCount = controller.snapshot?.transmitters.filter(\.isUsable).count ?? 0
+            let linked = linkedCount == 1 ? "Wireless mic linked" : "\(linkedCount) wireless mics linked"
             let band = controller.snapshot?.lowestUsableBatteryBand ?? .unknown
             return StatusPresentation(
                 icon: StatusIconFactory.activeMicrophone(battery: band, accessibilityLabel: accessibility),
@@ -179,7 +177,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return StatusPresentation(
                 icon: NSImage(systemSymbolName: "exclamationmark.triangle", accessibilityDescription: accessibility),
                 title: "Input unavailable",
-                subtitle: "Choose the receiver under DJI Input",
+                subtitle: "Choose the receiver under Wireless Mic",
                 battery: batteryText(for: controller.snapshot?.lowestUsableBatteryBand ?? .unknown)
             )
 
@@ -227,14 +225,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         case .waiting:
             return "Waiting for receiver state…"
         case .usingDJI:
-            let transmitters = controller.snapshot?.transmitters.map { tx in
-                var text = "TX\(tx.slot) linked"
-                if tx.batteryBand != .unknown {
-                    text += " · \(tx.batteryBand.label.lowercased())"
-                }
-                return text
-            }.joined(separator: ", ") ?? "Transmitter linked"
-            return transmitters
+            let linked = controller.snapshot?.transmitters.filter(\.isUsable) ?? []
+            let count = linked.count
+            var text = count == 1 ? "Wireless mic linked" : "\(count) wireless mics linked"
+            if let band = controller.snapshot?.lowestUsableBatteryBand, band != .unknown {
+                text += " · \(band.label.lowercased())"
+            }
+            return text
         case .usingFallback:
             if controller.snapshot?.receiverPresent == false { return "Receiver not connected · using fallback" }
             return "Wireless mic offline · using fallback"
@@ -248,10 +245,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func updateTransmitterMenu(snapshot: LinkSnapshot) {
-        let submenu = NSMenu(title: "Transmitters")
+        let submenu = NSMenu(title: "Microphone Details")
 
         if snapshot.transmitters.isEmpty {
-            let none = NSMenuItem(title: "No transmitter linked", action: nil, keyEquivalent: "")
+            let none = NSMenuItem(title: "No wireless mic linked", action: nil, keyEquivalent: "")
             none.isEnabled = false
             submenu.addItem(none)
         } else {
@@ -260,7 +257,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 let battery = batteryText(for: tx.batteryBand)
                 let batteryLabel = battery == "Unavailable" ? "Battery unavailable" : "\(battery) battery"
                 let item = NSMenuItem(
-                    title: "TX\(tx.slot) · \(batteryLabel) · \(state)",
+                    title: "Mic \(tx.slot) · \(batteryLabel) · \(state)",
                     action: nil,
                     keyEquivalent: ""
                 )
@@ -339,7 +336,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             launchAtLoginItem.state = .mixed
             launchAtLoginItem.isEnabled = true
         case .unavailable:
-            launchAtLoginItem.title = "Launch at Login (Move App to Applications)"
+            launchAtLoginItem.title = "Launch at Login (Move to Applications)"
             launchAtLoginItem.state = .off
             launchAtLoginItem.isEnabled = true
         }
