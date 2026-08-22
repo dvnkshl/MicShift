@@ -55,7 +55,7 @@ final class StatusMenuHeaderView: NSView {
         addSubview(separator)
 
         NSLayoutConstraint.activate([
-            widthAnchor.constraint(equalToConstant: 400),
+            widthAnchor.constraint(equalToConstant: 360),
             heightAnchor.constraint(equalToConstant: 146),
 
             iconView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16),
