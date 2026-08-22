@@ -1,0 +1,62 @@
+name: Add a wireless microphone
+description: Share a privacy-reviewed protocol discovery report for a receiver we do not support yet.
+title: "Device support: "
+labels:
+  - device-support
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping expand hardware support. In MicShift, choose **Help Add a Microphone…**, complete every physical state you can, save the JSON report, and review it before uploading. Do not post a photograph of a serial-number label.
+  - type: input
+    id: receiver
+    attributes:
+      label: Receiver model
+      placeholder: DJI Mic 2 Receiver
+    validations:
+      required: true
+  - type: input
+    id: transmitters
+    attributes:
+      label: Transmitter model and quantity
+      placeholder: Two DJI Mic 2 transmitters
+    validations:
+      required: true
+  - type: input
+    id: firmware
+    attributes:
+      label: Receiver and transmitter firmware
+      description: Include every version you can read from the receiver UI or official update tool.
+    validations:
+      required: true
+  - type: checkboxes
+    id: states
+    attributes:
+      label: States marked in the report
+      options:
+        - label: Receiver connected with no transmitter
+        - label: Transmitter linked and active
+        - label: Transmitter in the charging case
+        - label: Transmitter powered off
+        - label: Wireless link lost or out of range
+        - label: Transmitter reconnected
+        - label: Second transmitter linked, if supported
+  - type: textarea
+    id: behavior
+    attributes:
+      label: What you observed
+      description: Note anything shown on the receiver when the transmitter state changes.
+  - type: textarea
+    id: report
+    attributes:
+      label: Privacy-reviewed discovery report
+      description: Drag the JSON file here after reviewing it. The app omits USB serial descriptors and redacts long text, but unknown binary fields may remain.
+    validations:
+      required: true
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy review
+      options:
+        - label: I reviewed the JSON before attaching it and did not include a serial-label photograph.
+          required: true

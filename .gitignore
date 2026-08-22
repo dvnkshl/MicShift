@@ -1,0 +1,11 @@
+.DS_Store
+.build/
+.swiftpm/
+build/
+Release/
+target/
+*.dmg
+*.zip
+*.xcarchive
+*.xcresult
+xcuserdata/

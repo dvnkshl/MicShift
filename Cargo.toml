@@ -1,0 +1,25 @@
+[workspace]
+resolver = "2"
+members = [
+    "Helper",
+    "Vendor/dji-mic-control/crates/protocol",
+    "Vendor/dji-mic-control/crates/device",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "Unlicense"
+rust-version = "1.81"
+
+[workspace.dependencies]
+protocol = { path = "Vendor/dji-mic-control/crates/protocol" }
+device = { path = "Vendor/dji-mic-control/crates/device" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+anyhow = "1"
+nusb = "0.1"
+futures-lite = "2"
+async-channel = "2"
+clap = { version = "4", features = ["derive"] }

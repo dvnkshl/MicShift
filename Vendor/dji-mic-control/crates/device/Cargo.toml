@@ -1,0 +1,14 @@
+[package]
+name = "device"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "USB transport and multi-device orchestration for DJI wireless microphones."
+
+[dependencies]
+protocol = { workspace = true }
+nusb = { workspace = true }
+futures-lite = { workspace = true }
+async-channel = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true }
