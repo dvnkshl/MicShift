@@ -31,8 +31,8 @@ They require separate protocol decoding and real-device transition testing.
 
 1. [Download the latest release](https://github.com/dvnkshl/MicShift/releases/latest).
 2. Open the DMG and drag **MicShift** to **Applications**.
-3. Launch MicShift and choose your wireless receiver under **DJI Input**.
-4. Choose the Mac or USB microphone to use under **Fallback Input**.
+3. Launch MicShift and choose your wireless receiver under **Wireless Mic**.
+4. Choose the Mac or USB microphone to use under **Fallback Mic**.
 5. Enable **Launch at Login** if you want MicShift available after every login.
 
 Set dictation and recording apps to **System Default**, **Default**, or
