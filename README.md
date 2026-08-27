@@ -123,6 +123,7 @@ export NOTARYTOOL_PROFILE='micshift-notary'
 
 See [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) for certificate setup and the
 clean-Mac acceptance test. The script refuses to overwrite an existing DMG.
+Release history is recorded in [CHANGELOG.md](CHANGELOG.md).
 
 ## Help add another microphone
 
