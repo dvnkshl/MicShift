@@ -34,8 +34,10 @@ helper. Direct distribution is the lower-risk first path.
 6. Verify the signature, notarization ticket, and Gatekeeper assessment on a
    clean macOS account before publishing.
 
-The current local build is only ad-hoc signed. It is good for development on
-this Mac but is not a public release artifact.
+`Scripts/build-app.sh` creates an ad-hoc-signed local development build. Public
+artifacts are produced with `Scripts/build-release.sh`, then verified for a
+Developer ID signature, notarization ticket, and Gatekeeper acceptance before
+publication.
 
 ## Prepared release command
 

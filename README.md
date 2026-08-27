@@ -39,8 +39,8 @@ Set dictation and recording apps to **System Default**, **Default**, or
 **Same as System**. Apps pinned to a specific input do not follow macOS default
 input changes.
 
-> The public DMG must be signed and notarized. Until the first GitHub Release is
-> published, build the app from source using the instructions below.
+> GitHub Release DMGs are signed, notarized, and stapled for Gatekeeper. The
+> current prebuilt release is for Apple Silicon Macs.
 
 ## What it does
 
