@@ -101,6 +101,39 @@ struct LinkSnapshot: Codable, Equatable {
         protocolVersion: nil,
         transmitters: []
     )
+
+    /// State that can change switching behavior or anything visible in the
+    /// menu. Audio-level samples are intentionally excluded so speaking does
+    /// not trigger Core Audio enumeration and menu redraws.
+    var presentationState: LinkPresentationState {
+        LinkPresentationState(
+            receiverPresent: receiverPresent,
+            receiverAccessible: receiverAccessible,
+            receiverStreaming: receiverStreaming,
+            transmitters: transmitters.map {
+                LinkPresentationState.Transmitter(
+                    slot: $0.slot,
+                    charging: $0.charging,
+                    battery: $0.battery,
+                    productName: $0.productName
+                )
+            }
+        )
+    }
+}
+
+struct LinkPresentationState: Equatable {
+    struct Transmitter: Equatable {
+        let slot: Int
+        let charging: Bool?
+        let battery: Int?
+        let productName: String?
+    }
+
+    let receiverPresent: Bool
+    let receiverAccessible: Bool
+    let receiverStreaming: Bool
+    let transmitters: [Transmitter]
 }
 
 enum DesiredInputMode: Equatable {

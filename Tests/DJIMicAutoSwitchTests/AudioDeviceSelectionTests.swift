@@ -78,6 +78,33 @@ final class AudioDeviceSelectionTests: XCTestCase {
         )
     }
 
+    func testCoreAudioHardwareObservationCanStartAndStop() {
+        XCTAssertNoThrow(try manager.startObservingChanges { _ in })
+        manager.stopObservingChanges()
+        manager.stopObservingChanges()
+    }
+
+    func testStartingCoreAudioObservationAgainReplacesPreviousListeners() {
+        XCTAssertNoThrow(try manager.startObservingChanges { _ in })
+        XCTAssertNoThrow(try manager.startObservingChanges { _ in })
+        manager.stopObservingChanges()
+    }
+
+    func testCachedDefaultInputLookupFindsMatchingDeviceID() {
+        let devices = [
+            device(id: 1, uid: "built-in", name: "MacBook Pro Microphone", builtIn: true),
+            device(id: 2, uid: "wireless", name: "Wireless Mic")
+        ]
+
+        XCTAssertEqual(manager.device(id: 2, among: devices)?.uid, "wireless")
+    }
+
+    func testCachedDefaultInputLookupReturnsNilForMissingDeviceID() {
+        let devices = [device(id: 1, uid: "built-in", name: "MacBook Pro Microphone", builtIn: true)]
+
+        XCTAssertNil(manager.device(id: 99, among: devices))
+    }
+
     private func device(id: AudioDeviceID, uid: String, name: String, builtIn: Bool = false) -> AudioInputDevice {
         AudioInputDevice(
             id: id,

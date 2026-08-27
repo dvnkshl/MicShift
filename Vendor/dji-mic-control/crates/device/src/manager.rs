@@ -94,8 +94,8 @@ impl DeviceManager {
 
     /// Enumerate the bus, dropping vanished devices and adopting new ones.
     ///
-    /// Cheap and idempotent — call it periodically (the GUI) or once before an
-    /// action (the CLI).
+    /// Idempotent, but it enumerates the full USB registry. Prefer calling it
+    /// for hot-plug events, stopped actors, or a slow recovery watchdog.
     pub fn refresh(&self) {
         let mut handles = self.handles.lock().unwrap();
         handles.retain(|_, h| h.actor.alive.load(Ordering::Relaxed));
@@ -153,6 +153,18 @@ impl DeviceManager {
     /// The most recent bus-scan result.
     pub fn probe(&self) -> Probe {
         self.probe.lock().unwrap().clone()
+    }
+
+    /// Whether a device actor stopped and the bus should be refreshed.
+    ///
+    /// This lets event-driven front-ends recover from a failed USB transfer
+    /// immediately without continuously enumerating the entire USB registry.
+    pub fn needs_refresh(&self) -> bool {
+        self.handles
+            .lock()
+            .unwrap()
+            .values()
+            .any(|handle| !handle.actor.alive.load(Ordering::Relaxed))
     }
 
     /// Summaries of all currently tracked devices.
@@ -275,5 +287,45 @@ fn device_id(serial: Option<&str>, bus: u8, address: u8) -> String {
     match serial {
         Some(s) if !s.is_empty() => s.to_string(),
         _ => format!("usb-{bus}-{address}"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::atomic::{AtomicBool, AtomicU64};
+    use std::sync::{Arc, Mutex};
+
+    use protocol::{DeviceStatus, MODELS};
+
+    use super::{Actor, DeviceManager, Handle};
+
+    fn test_actor(alive: bool) -> Actor {
+        let model = MODELS[0];
+        let (cmd_tx, _cmd_rx) = async_channel::unbounded();
+        Actor {
+            cmd_tx,
+            status: Arc::new(Mutex::new(DeviceStatus::disconnected(model.id()))),
+            alive: Arc::new(AtomicBool::new(alive)),
+            last_seen: Arc::new(AtomicU64::new(0)),
+        }
+    }
+
+    #[test]
+    fn needs_refresh_only_when_a_tracked_actor_stops() {
+        let manager = DeviceManager::new();
+        assert!(!manager.needs_refresh());
+
+        let model = MODELS[0];
+        let actor = test_actor(true);
+        let alive = actor.alive.clone();
+        manager
+            .handles
+            .lock()
+            .unwrap()
+            .insert("test-device".to_string(), Handle { model, actor });
+
+        assert!(!manager.needs_refresh());
+        alive.store(false, std::sync::atomic::Ordering::Relaxed);
+        assert!(manager.needs_refresh());
     }
 }

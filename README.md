@@ -76,6 +76,12 @@ On the current v2 Mic Mini protocol:
 Audio level is decoded for diagnostics but deliberately not used as the
 availability gate. A muted user or quiet room must never cause a fallback.
 
+MicShift listens for native USB hot-plug and Core Audio device/default-input
+notifications instead of continuously rescanning hardware. A slow 30-second
+watchdog remains for recovery if macOS misses an event, while inaccessible
+receivers retry every two seconds. Status packets that only change the live
+audio-level meter do not trigger device enumeration or redraw the menu.
+
 Read [DJI_USB_CAPABILITIES.md](DJI_USB_CAPABILITIES.md) for the complete decoded
 state and [RESEARCH.md](RESEARCH.md) for the original protocol investigation.
 

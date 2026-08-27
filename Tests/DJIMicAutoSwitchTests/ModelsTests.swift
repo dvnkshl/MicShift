@@ -156,6 +156,50 @@ final class ModelsTests: XCTestCase {
         XCTAssertFalse(LinkSnapshot.unavailable.hasUsableTransmitter)
     }
 
+    func testAudioLevelChangesDoNotChangePresentationState() {
+        let first = snapshot(level: 2, battery: 4, charging: false)
+        let speaking = snapshot(level: 28, battery: 4, charging: false)
+
+        XCTAssertNotEqual(first, speaking)
+        XCTAssertEqual(first.presentationState, speaking.presentationState)
+    }
+
+    func testBatteryAndLinkChangesUpdatePresentationState() {
+        let baseline = snapshot(level: 2, battery: 4, charging: false)
+
+        XCTAssertNotEqual(
+            baseline.presentationState,
+            snapshot(level: 2, battery: 6, charging: false).presentationState
+        )
+        XCTAssertNotEqual(
+            baseline.presentationState,
+            snapshot(level: 2, battery: 4, charging: true).presentationState
+        )
+        XCTAssertNotEqual(baseline.presentationState, LinkSnapshot.unavailable.presentationState)
+    }
+
+    func testVisibleTransmitterMetadataChangesPresentationState() {
+        let baseline = snapshot(level: 2, battery: 4, charging: false)
+        let renamed = LinkSnapshot(
+            receiverPresent: true,
+            receiverAccessible: true,
+            receiverStreaming: true,
+            deviceID: "rx",
+            protocolVersion: 2,
+            transmitters: [
+                TransmitterSnapshot(
+                    slot: 2,
+                    charging: false,
+                    battery: 4,
+                    level: 2,
+                    productName: "Another Wireless Mic"
+                )
+            ]
+        )
+
+        XCTAssertNotEqual(baseline.presentationState, renamed.presentationState)
+    }
+
     func testTenThousandOnlineOfflineTransitionsRemainDeterministic() {
         let linked = LinkSnapshot(
             receiverPresent: true,
@@ -233,5 +277,24 @@ final class ModelsTests: XCTestCase {
         XCTAssertEqual(device.knownModel, "DJI Mic Mini")
         XCTAssertTrue(device.captureSupported)
         XCTAssertEqual(device.interfaces.first?.endpoints.first?.transferType, "bulk")
+    }
+
+    private func snapshot(level: Int, battery: Int, charging: Bool) -> LinkSnapshot {
+        LinkSnapshot(
+            receiverPresent: true,
+            receiverAccessible: true,
+            receiverStreaming: true,
+            deviceID: "rx",
+            protocolVersion: 2,
+            transmitters: [
+                TransmitterSnapshot(
+                    slot: 1,
+                    charging: charging,
+                    battery: battery,
+                    level: level,
+                    productName: "DJI Mic Mini 2"
+                )
+            ]
+        )
     }
 }

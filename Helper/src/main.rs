@@ -1,6 +1,6 @@
 use std::env;
 use std::io::{self, Write};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -130,10 +130,50 @@ fn transmitters(status: &DeviceStatus) -> Vec<TransmitterSnapshot> {
         .collect()
 }
 
+fn should_refresh_bus(
+    hotplug_event: bool,
+    hotplug_retry_due: bool,
+    hotplug_available: bool,
+    probe_present: usize,
+    probe_accessible: usize,
+    elapsed_since_scan: Duration,
+    manager_needs_refresh: bool,
+) -> bool {
+    let inaccessible_receiver_retry_due =
+        probe_present > probe_accessible && elapsed_since_scan >= Duration::from_secs(2);
+    let watchdog_due = elapsed_since_scan
+        >= if hotplug_available {
+            Duration::from_secs(30)
+        } else {
+            Duration::from_secs(2)
+        };
+
+    hotplug_event
+        || hotplug_retry_due
+        || inaccessible_receiver_retry_due
+        || watchdog_due
+        || manager_needs_refresh
+}
+
 fn monitor() -> Result<(), Box<dyn std::error::Error>> {
     let manager = DeviceManager::new();
+    let refresh_requested = Arc::new(AtomicBool::new(true));
+    let hotplug_available = match nusb::watch_devices() {
+        Ok(watch) => {
+            let refresh_requested = refresh_requested.clone();
+            thread::spawn(move || {
+                for _event in futures_lite::stream::block_on(watch) {
+                    refresh_requested.store(true, Ordering::Release);
+                }
+            });
+            true
+        }
+        Err(_) => false,
+    };
     let mut last_line = String::new();
     let mut last_emit = Instant::now() - Duration::from_secs(10);
+    let mut last_bus_scan = Instant::now() - Duration::from_secs(60);
+    let mut hotplug_retry_at: Option<Instant> = None;
     // The helper normally exits when LinkMonitor closes it. This additional
     // parent check covers Force Quit and app crashes, where Swift cannot run
     // applicationWillTerminate and the stdout watchdog can take up to 2s.
@@ -143,7 +183,25 @@ fn monitor() -> Result<(), Box<dyn std::error::Error>> {
         if unsafe { libc::getppid() } != parent_pid {
             return Ok(());
         }
-        manager.refresh();
+        let hotplug_event = refresh_requested.swap(false, Ordering::AcqRel);
+        let hotplug_retry_due = hotplug_retry_at.is_some_and(|deadline| Instant::now() >= deadline);
+        let probe = manager.probe();
+        if should_refresh_bus(
+            hotplug_event,
+            hotplug_retry_due,
+            hotplug_available,
+            probe.present,
+            probe.accessible,
+            last_bus_scan.elapsed(),
+            manager.needs_refresh(),
+        ) {
+            manager.refresh();
+            last_bus_scan = Instant::now();
+            // A disconnect notification can arrive just before the USB actor
+            // observes its failed transfer. One delayed pass closes that race
+            // without returning to continuous registry scans.
+            hotplug_retry_at = hotplug_event.then(|| Instant::now() + Duration::from_millis(750));
+        }
         let line = serde_json::to_string(&Snapshot::from_manager(&manager))?;
 
         // Emit immediately when state changes and periodically as a watchdog.
@@ -460,7 +518,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 #[cfg(test)]
 mod tests {
-    use super::redact_ascii_runs;
+    use std::time::Duration;
+
+    use super::{redact_ascii_runs, should_refresh_bus};
 
     #[test]
     fn redacts_long_ascii_identifiers_without_touching_binary_state() {
@@ -480,5 +540,90 @@ mod tests {
         let mut packet = *b"\x55ABC\x01";
         assert!(redact_ascii_runs(&mut packet).is_empty());
         assert_eq!(&packet, b"\x55ABC\x01");
+    }
+
+    #[test]
+    fn refreshes_immediately_for_hotplug_retry_or_dead_actor() {
+        for (hotplug, retry, dead_actor) in [
+            (true, false, false),
+            (false, true, false),
+            (false, false, true),
+        ] {
+            assert!(should_refresh_bus(
+                hotplug,
+                retry,
+                true,
+                0,
+                0,
+                Duration::ZERO,
+                dead_actor,
+            ));
+        }
+    }
+
+    #[test]
+    fn event_watch_uses_slow_thirty_second_watchdog() {
+        assert!(!should_refresh_bus(
+            false,
+            false,
+            true,
+            0,
+            0,
+            Duration::from_secs(29),
+            false,
+        ));
+        assert!(should_refresh_bus(
+            false,
+            false,
+            true,
+            0,
+            0,
+            Duration::from_secs(30),
+            false,
+        ));
+    }
+
+    #[test]
+    fn missing_hotplug_support_uses_two_second_watchdog() {
+        assert!(!should_refresh_bus(
+            false,
+            false,
+            false,
+            0,
+            0,
+            Duration::from_millis(1_999),
+            false,
+        ));
+        assert!(should_refresh_bus(
+            false,
+            false,
+            false,
+            0,
+            0,
+            Duration::from_secs(2),
+            false,
+        ));
+    }
+
+    #[test]
+    fn inaccessible_receiver_retries_without_continuous_scanning() {
+        assert!(!should_refresh_bus(
+            false,
+            false,
+            true,
+            1,
+            0,
+            Duration::from_secs(1),
+            false,
+        ));
+        assert!(should_refresh_bus(
+            false,
+            false,
+            true,
+            1,
+            0,
+            Duration::from_secs(2),
+            false,
+        ));
     }
 }
