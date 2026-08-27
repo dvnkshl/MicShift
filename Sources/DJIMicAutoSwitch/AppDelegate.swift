@@ -111,7 +111,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     func menuWillOpen(_ menu: NSMenu) {
-        refreshMenu()
+        // Opening the menu is an explicit request for a fresh device list.
+        // Normal operation stays event-driven; this protects against a rare
+        // missed Core Audio notification without background polling.
+        controller.refresh()
     }
 
     private func configureStatusButton() {

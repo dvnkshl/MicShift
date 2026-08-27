@@ -40,6 +40,26 @@ enum AudioDeviceError: LocalizedError {
     }
 }
 
+enum AudioHardwareChange {
+    case devices
+    case defaultInput
+}
+
+protocol AudioDeviceManaging: AnyObject {
+    func inputDevices() throws -> [AudioInputDevice]
+    func currentDefaultInput(among devices: [AudioInputDevice]) throws -> AudioInputDevice?
+    func setDefaultInput(_ device: AudioInputDevice) throws
+    func preferredDJI(uid: String?, among devices: [AudioInputDevice]) -> AudioInputDevice?
+    func preferredFallback(
+        explicitUID: String?,
+        rememberedUID: String?,
+        excludingUID: String?,
+        among devices: [AudioInputDevice]
+    ) -> AudioInputDevice?
+    func startObservingChanges(_ handler: @escaping (AudioHardwareChange) -> Void) throws
+    func stopObservingChanges()
+}
+
 private func formatOSStatus(_ status: OSStatus) -> String {
     let value = UInt32(bitPattern: status)
     let bytes = [24, 16, 8, 0].map { UInt8((value >> UInt32($0)) & 0xff) }
@@ -49,8 +69,10 @@ private func formatOSStatus(_ status: OSStatus) -> String {
     return String(status)
 }
 
-final class AudioDeviceManager {
+final class AudioDeviceManager: AudioDeviceManaging {
     private let systemObject = AudioObjectID(kAudioObjectSystemObject)
+    private let observationQueue = DispatchQueue(label: "com.micshift.core-audio-events")
+    private var observations: [(AudioObjectPropertyAddress, AudioObjectPropertyListenerBlock)] = []
 
     func inputDevices() throws -> [AudioInputDevice] {
         var address = AudioObjectPropertyAddress(
@@ -88,6 +110,10 @@ final class AudioDeviceManager {
     }
 
     func currentDefaultInput() throws -> AudioInputDevice? {
+        try currentDefaultInput(among: inputDevices())
+    }
+
+    func currentDefaultInput(among devices: [AudioInputDevice]) throws -> AudioInputDevice? {
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyDefaultInputDevice,
             mScope: kAudioObjectPropertyScopeGlobal,
@@ -96,7 +122,63 @@ final class AudioDeviceManager {
         var id = AudioDeviceID(0)
         var size = UInt32(MemoryLayout<AudioDeviceID>.size)
         try check(AudioObjectGetPropertyData(systemObject, &address, 0, nil, &size, &id), "Read default input")
-        return try inputDevices().first(where: { $0.id == id })
+        return device(id: id, among: devices)
+    }
+
+    func startObservingChanges(_ handler: @escaping (AudioHardwareChange) -> Void) throws {
+        stopObservingChanges()
+
+        let registrations: [(AudioObjectPropertyAddress, AudioHardwareChange)] = [
+            (
+                AudioObjectPropertyAddress(
+                    mSelector: kAudioHardwarePropertyDevices,
+                    mScope: kAudioObjectPropertyScopeGlobal,
+                    mElement: kAudioObjectPropertyElementMain
+                ),
+                .devices
+            ),
+            (
+                AudioObjectPropertyAddress(
+                    mSelector: kAudioHardwarePropertyDefaultInputDevice,
+                    mScope: kAudioObjectPropertyScopeGlobal,
+                    mElement: kAudioObjectPropertyElementMain
+                ),
+                .defaultInput
+            ),
+        ]
+
+        do {
+            for (address, change) in registrations {
+                var mutableAddress = address
+                let block: AudioObjectPropertyListenerBlock = { _, _ in handler(change) }
+                try check(
+                    AudioObjectAddPropertyListenerBlock(
+                        systemObject,
+                        &mutableAddress,
+                        observationQueue,
+                        block
+                    ),
+                    "Observe audio hardware changes"
+                )
+                observations.append((address, block))
+            }
+        } catch {
+            stopObservingChanges()
+            throw error
+        }
+    }
+
+    func stopObservingChanges() {
+        for (address, block) in observations {
+            var mutableAddress = address
+            AudioObjectRemovePropertyListenerBlock(
+                systemObject,
+                &mutableAddress,
+                observationQueue,
+                block
+            )
+        }
+        observations.removeAll()
     }
 
     func setDefaultInput(_ device: AudioInputDevice) throws {
@@ -115,6 +197,10 @@ final class AudioDeviceManager {
 
     func device(uid: String, among devices: [AudioInputDevice]) -> AudioInputDevice? {
         devices.first(where: { $0.uid == uid })
+    }
+
+    func device(id: AudioDeviceID, among devices: [AudioInputDevice]) -> AudioInputDevice? {
+        devices.first(where: { $0.id == id })
     }
 
     func preferredDJI(uid: String?, among devices: [AudioInputDevice]) -> AudioInputDevice? {
